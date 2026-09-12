@@ -1,0 +1,2021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+<title>Lendly — Never forget who has your stuff</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<meta name="description" content="Track everything you lend out: who has it, their contact info, what it's worth, and when it's due back." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<style>
+  html, body { margin: 0; padding: 0; background: #07070a; }
+  #root { min-height: 100vh; }
+  * { box-sizing: border-box; }
+  button { font-family: inherit; cursor: pointer; background: none; border: none; padding: 0; }
+  input, textarea { font-family: inherit; }
+  a { text-decoration: none; }
+  #boot-status {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    color: #8b8b98; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px; text-align: center; padding: 24px;
+  }
+</style>
+</head>
+<body>
+<div id="root"><div id="boot-status">Loading Lendly…</div></div>
+
+<script>
+  window.addEventListener("error", function (e) {
+    var el = document.getElementById("boot-status");
+    if (el) {
+      el.innerHTML =
+        '<div style="max-width:420px"><div style="font-weight:700;color:#f4f4f7;margin-bottom:8px;">Lendly couldn\'t load</div>' +
+        '<div style="color:#ff8a8a;font-size:12.5px;word-break:break-word;">' +
+        (e.message || "Unknown error") +
+        '</div><div style="margin-top:10px;color:#5b5b66;font-size:12px;">Try refreshing. If this keeps happening, check your internet connection or that the page is served over https.</div></div>';
+    }
+  }, true);
+</script>
+
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<script type="text/babel" data-type="module" data-presets="react">
+import React, { useState, useEffect, useRef, useContext, createContext } from "https://esm.sh/react@18";
+import ReactDOM from "https://esm.sh/react-dom@18/client";
+import {
+  Plus, X, Check, Phone, Mail, DollarSign, Package,
+  Users, CheckCircle2, Camera, Trash2, Pencil, ChevronLeft,
+  Clock, MoreVertical, ImageOff, Sun, Moon, History, RotateCcw,
+  HandCoins, LogOut, Lock
+} from "https://esm.sh/lucide-react@0.383.0?deps=react@18,react-dom@18";
+
+/* ---------- Local storage shim ----------
+   Used for theme/items/history (per-browser data). No login session is
+   persisted here on purpose — every fresh visit always shows sign-in,
+   so a shared/public computer never leaks the last user's email. */
+const STORAGE_PREFIX = "lendly-app";
+function storageKey(key, shared) {
+  return `${STORAGE_PREFIX}:${shared ? "shared" : "personal"}:${key}`;
+}
+window.storage = {
+  async get(key, shared = false) {
+    try {
+      const raw = window.localStorage.getItem(storageKey(key, shared));
+      if (raw === null) return null;
+      return { key, value: raw, shared };
+    } catch (e) {
+      return null;
+    }
+  },
+  async set(key, value, shared = false) {
+    try {
+      window.localStorage.setItem(storageKey(key, shared), value);
+      return { key, value, shared };
+    } catch (e) {
+      return null;
+    }
+  },
+  async delete(key, shared = false) {
+    try {
+      window.localStorage.removeItem(storageKey(key, shared));
+      return { key, deleted: true, shared };
+    } catch (e) {
+      return null;
+    }
+  },
+  async list(prefix = "", shared = false) {
+    try {
+      const base = `${STORAGE_PREFIX}:${shared ? "shared" : "personal"}:`;
+      const keys = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (k && k.startsWith(base) && k.slice(base.length).startsWith(prefix)) {
+          keys.push(k.slice(base.length));
+        }
+      }
+      return { keys, prefix, shared };
+    } catch (e) {
+      return null;
+    }
+  },
+};
+
+const THEMES = {
+  dark: {
+    id: "dark",
+    bg: "#07070a",
+    surface: "#131319",
+    surfaceRaised: "#1b1b24",
+    border: "#26262f",
+    primary: "#5b4feb",
+    primaryLight: "#8b7bff",
+    primaryDim: "#413792",
+    primarySoft: "rgba(91,79,235,0.16)",
+    green: "#39d98a",
+    greenSoft: "rgba(57,217,138,0.14)",
+    text: "#f4f4f7",
+    heroText: "#ffffff",
+    muted: "#8b8b98",
+    mutedDark: "#5b5b66",
+    accentBlue: "#6fa8ff",
+    overlay: "rgba(0,0,0,0.6)",
+    overlayStrong: "rgba(0,0,0,0.65)",
+  },
+  light: {
+    id: "light",
+    bg: "#ffffff",
+    surface: "#f3f7f4",
+    surfaceRaised: "#e8f1ea",
+    border: "#dbe6de",
+    primary: "#1fa155",
+    primaryLight: "#5fd68a",
+    primaryDim: "#17803f",
+    primarySoft: "rgba(31,161,85,0.13)",
+    green: "#1fa155",
+    greenSoft: "rgba(31,161,85,0.13)",
+    text: "#12180f",
+    heroText: "#12180f",
+    muted: "#5c6b60",
+    mutedDark: "#93a398",
+    accentBlue: "#2a8a5e",
+    overlay: "rgba(20,30,22,0.35)",
+    overlayStrong: "rgba(20,30,22,0.4)",
+  },
+};
+
+const ColorContext = createContext(THEMES.dark);
+function useColors() {
+  return useContext(ColorContext);
+}
+
+/* ---------- Paywall config ---------- */
+const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/00weVcbnTa24g6b7FHefC00";
+
+/* ---------- Supabase config ---------- */
+// Paste your values from Supabase → Settings → API here.
+const SUPABASE_URL = "https://xasnckevnntshmmgamvd.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhhc25ja2V2bm50c2htbWdhbXZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3MjA1OTUsImV4cCI6MjEwMjI5NjU5NX0.BwMC7M_2CxG9F4QRYXD0fLYhc79LA_8s9jXD6CyCCmU";
+
+async function supabaseRpc(fnName, params) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let message = text;
+    try {
+      const parsed = JSON.parse(text);
+      message = parsed.message || text;
+    } catch (e) {
+      // not JSON — use raw text
+    }
+    throw new Error(message || `Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
+async function supabaseAccountExists(email) {
+  return await supabaseRpc("lendly_account_exists", { p_email: email });
+}
+
+async function supabaseSignUp(email, passwordHash) {
+  const rows = await supabaseRpc("lendly_signup", {
+    p_email: email,
+    p_password_hash: passwordHash,
+  });
+  return rows && rows.length ? rows[0] : null;
+}
+
+async function supabaseLogIn(email, passwordHash) {
+  const rows = await supabaseRpc("lendly_login", {
+    p_email: email,
+    p_password_hash: passwordHash,
+  });
+  return rows && rows.length ? rows[0] : null;
+}
+
+async function supabaseCheckPayment(email) {
+  const rows = await supabaseRpc("lendly_check_payment", { p_email: email });
+  return rows && rows.length ? rows[0] : null;
+}
+
+const FONT_IMPORT_ID = "lendly-fonts";
+
+function useFonts() {
+  useEffect(() => {
+    if (document.getElementById(FONT_IMPORT_ID)) return;
+    const link = document.createElement("link");
+    link.id = FONT_IMPORT_ID;
+    link.rel = "stylesheet";
+    link.href =
+      "https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap";
+    document.head.appendChild(link);
+  }, []);
+}
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function timeSince(dateStr) {
+  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "1 day out";
+  if (days < 30) return `${days} days out`;
+  const months = Math.floor(days / 30);
+  if (months === 1) return "1 month out";
+  return `${months} months out`;
+}
+
+function formatCost(v) {
+  const n = parseFloat(v);
+  if (isNaN(n)) return null;
+  return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
+
+function todayInputValue() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
+function toDateInputValue(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
+function formatDatePretty(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function isOverdue(item) {
+  if (item.returned || !item.returnBy) return false;
+  const d = new Date(item.returnBy);
+  if (isNaN(d.getTime())) return false;
+  const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+  return Date.now() > endOfDay.getTime();
+}
+
+function relativeTime(iso) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function dayGroupLabel(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const startOf = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const diffDays = Math.round((startOf(now) - startOf(d)) / 86400000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return d.toLocaleDateString(undefined, { weekday: "long" });
+  return d.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+}
+
+function isEmail(v) {
+  return /\S+@\S+\.\S+/.test(v);
+}
+
+function fallbackHash(str) {
+  let h1 = 0xdeadbeef,
+    h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
+}
+
+async function hashPassword(pw) {
+  try {
+    if (window.crypto && window.crypto.subtle) {
+      const enc = new TextEncoder().encode(pw);
+      const buf = await window.crypto.subtle.digest("SHA-256", enc);
+      return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+  } catch (e) {
+    // fall through to fallback hash
+  }
+  return fallbackHash(pw);
+}
+
+
+function contactHref(v) {
+  if (!v) return null;
+  if (isEmail(v)) return `mailto:${v}`;
+  const digits = v.replace(/[^\d+]/g, "");
+  if (digits.length >= 7) return `tel:${digits}`;
+  return null;
+}
+
+function compressImage(file, maxW = 640, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ---------- Brush stroke signature element ---------- */
+function BrushStroke({ style }) {
+  const colors = useColors();
+  return (
+    <svg
+      viewBox="0 0 400 60"
+      preserveAspectRatio="none"
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", ...style }}
+    >
+      <polygon
+        points="2,18 40,4 120,10 210,2 300,12 370,3 398,16 396,44 340,56 260,48 170,58 90,50 20,58 3,42"
+        fill={colors.primary}
+      />
+    </svg>
+  );
+}
+
+/* ---------- Logo ---------- */
+function LendlyLogo({ size = 30 }) {
+  const colors = useColors();
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size * 0.28,
+        background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryLight})`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        boxShadow: `0 0 0 1px rgba(255,255,255,0.06), 0 4px 14px ${colors.primarySoft}`,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: "'Anton', sans-serif",
+          fontSize: size * 0.62,
+          color: "#fff",
+          lineHeight: 1,
+          marginTop: 1,
+        }}
+      >
+        L
+      </span>
+    </div>
+  );
+}
+
+/* ---------- Photo circle/thumb ---------- */
+function Thumb({ src, size = 52, radius = 14 }) {
+  const colors = useColors();
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: radius,
+        overflow: "hidden",
+        flexShrink: 0,
+        background: colors.surfaceRaised,
+        border: `1px solid ${colors.border}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {src ? (
+        <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      ) : (
+        <Package size={size * 0.4} color={colors.mutedDark} strokeWidth={1.75} />
+      )}
+    </div>
+  );
+}
+
+function authInputStyle(colors) {
+  return {
+    width: "100%",
+    background: colors.surface,
+    border: `1px solid ${colors.border}`,
+    borderRadius: 12,
+    padding: "12px 12px",
+    color: colors.text,
+    fontSize: 14,
+    outline: "none",
+  };
+}
+
+/* ---------- Paywall (mini ad + pay gate) ---------- */
+function Paywall({ themeName, toggleTheme, onCheckPayment, accountEmail, onBack }) {
+  const colors = useColors();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [checkedOnce, setCheckedOnce] = useState(false);
+
+  function goToPayment() {
+    window.open(STRIPE_PAYMENT_LINK, "_blank", "noopener,noreferrer");
+  }
+
+  async function submitCheck() {
+    setError("");
+    setBusy(true);
+    const errMsg = await onCheckPayment();
+    if (errMsg) setError(errMsg);
+    setCheckedOnce(true);
+    setBusy(false);
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 20px 0" }}>
+        <button
+          onClick={onBack}
+          aria-label="Back to sign in"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            color: colors.muted,
+            fontSize: 13.5,
+            fontWeight: 600,
+            padding: "6px 4px",
+          }}
+        >
+          <ChevronLeft size={18} /> Back
+        </button>
+        <button
+          onClick={toggleTheme}
+          aria-label="Toggle theme"
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            background: colors.surface,
+            border: `1px solid ${colors.border}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {themeName === "dark" ? <Sun size={16} color={colors.muted} /> : <Moon size={16} color={colors.muted} />}
+        </button>
+      </div>
+
+      <div style={{ flex: 1, padding: "18px 24px 40px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, alignSelf: "flex-start" }}>
+          <LendlyLogo />
+          <div style={{ fontFamily: "'Anton', sans-serif", fontSize: 20, letterSpacing: 0.5 }}>LENDLY</div>
+        </div>
+
+        {/* Poster hero */}
+        <div style={{ marginTop: 26, fontFamily: "'Anton', sans-serif", lineHeight: 0.94, alignSelf: "flex-start" }}>
+          <div style={{ fontSize: 34, color: colors.heroText, letterSpacing: 0.5 }}>LEND IT.</div>
+          <div style={{ fontSize: 34, color: colors.primary, letterSpacing: 0.5, marginTop: 2 }}>TRACK IT.</div>
+          <div style={{ position: "relative", display: "inline-block", marginTop: 8 }}>
+            <BrushStroke style={{ transform: "scale(1.08, 1.35)", zIndex: 0 }} />
+            <span
+              style={{
+                position: "relative",
+                zIndex: 1,
+                fontSize: 34,
+                color: colors.bg,
+                letterSpacing: 0.5,
+                padding: "2px 14px",
+                display: "inline-block",
+              }}
+            >
+              GET IT BACK.
+            </span>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 13.5, color: colors.muted, marginTop: 18, alignSelf: "flex-start", lineHeight: 1.6 }}>
+          Never forget who has your stuff. Lendly tracks every item you lend out — a
+          photo, who has it, their contact info, what it's worth, and when it's due back.
+        </div>
+
+        {/* Feature bullets */}
+        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10, marginTop: 24 }}>
+          <AdFeature icon={<Camera size={16} color={colors.primary} />} text="Snap a photo of what you lent out" />
+          <AdFeature icon={<Users size={16} color={colors.primary} />} text="Log who has it and how to reach them" />
+          <AdFeature icon={<Clock size={16} color={colors.primary} />} text="Get an overdue flag when it's late" />
+          <AdFeature icon={<History size={16} color={colors.primary} />} text="Full history of every loan, ever" />
+        </div>
+
+        {/* Price + pay button */}
+        <div
+          style={{
+            width: "100%",
+            marginTop: 30,
+            background: colors.surface,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 18,
+            padding: "20px 20px 18px",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontFamily: "'Anton', sans-serif", fontSize: 30, letterSpacing: 0.3 }}>$5</div>
+          <div style={{ fontSize: 11.5, color: colors.muted, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>
+            One-time payment · yours for good
+          </div>
+
+          <button
+            onClick={goToPayment}
+            style={{
+              width: "100%",
+              marginTop: 16,
+              padding: "14px 0",
+              borderRadius: 14,
+              background: colors.primary,
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: 14.5,
+            }}
+          >
+            Pay $5 to unlock Lendly
+          </button>
+
+          <div style={{ fontSize: 11, color: colors.mutedDark, marginTop: 12, lineHeight: 1.5 }}>
+            Opens a secure Stripe checkout page. Pay with this exact email: <strong style={{ color: colors.text }}>{accountEmail}</strong> — then hit "Check now" below, it unlocks automatically.
+          </div>
+        </div>
+
+        {/* Automatic email-based payment check */}
+        <div
+          style={{
+            width: "100%",
+            marginTop: 18,
+            background: colors.surface,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 18,
+            padding: "18px 20px",
+          }}
+        >
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: colors.text, marginBottom: 4 }}>
+            Already paid?
+          </div>
+          <div style={{ fontSize: 12, color: colors.muted, marginBottom: 12 }}>
+            We'll check for a payment from <strong style={{ color: colors.text }}>{accountEmail}</strong>.
+          </div>
+          <button
+            onClick={submitCheck}
+            disabled={busy}
+            style={{
+              width: "100%",
+              padding: "12px 0",
+              borderRadius: 12,
+              background: colors.primary,
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: 13.5,
+              opacity: busy ? 0.6 : 1,
+            }}
+          >
+            {busy ? "Checking…" : "Check now"}
+          </button>
+          {error && <div style={{ fontSize: 12, color: "#ff8a8a", marginTop: 10 }}>{error}</div>}
+          {checkedOnce && !error && (
+            <div style={{ fontSize: 12, color: colors.mutedDark, marginTop: 10 }}>
+              Just paid? It can take a few seconds to show up — try again shortly.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdFeature({ icon, text }) {
+  const colors = useColors();
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: "10px 12px" }}>
+      <div style={{ width: 28, height: 28, borderRadius: 8, background: colors.primarySoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {icon}
+      </div>
+      <div style={{ fontSize: 13, color: colors.text, fontWeight: 500 }}>{text}</div>
+    </div>
+  );
+}
+
+/* ---------- Auth screen ---------- */
+function AuthScreen({ busy, error, onSubmit, clearError, themeName, toggleTheme }) {
+  const colors = useColors();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [localError, setLocalError] = useState("");
+
+  function submit() {
+    clearError();
+    setLocalError("");
+    if (!isEmail(email.trim())) {
+      setLocalError("Enter a valid email address.");
+      return;
+    }
+    if (password.length < 4) {
+      setLocalError("Password must be at least 4 characters.");
+      return;
+    }
+    onSubmit(email.trim(), password);
+  }
+
+  const displayError = localError || error;
+  const canSubmit = email.trim() && password;
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: "24px 24px 40px" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button
+          onClick={toggleTheme}
+          aria-label="Toggle theme"
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            background: colors.surface,
+            border: `1px solid ${colors.border}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {themeName === "dark" ? <Sun size={16} color={colors.muted} /> : <Moon size={16} color={colors.muted} />}
+        </button>
+      </div>
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+        <LendlyLogo size={52} />
+        <div style={{ fontFamily: "'Anton', sans-serif", fontSize: 26, letterSpacing: 0.5, marginTop: 14 }}>LENDLY</div>
+        <div
+          style={{
+            fontSize: 11,
+            letterSpacing: 1,
+            color: colors.muted,
+            marginTop: 4,
+            textTransform: "uppercase",
+            fontWeight: 600,
+            textAlign: "center",
+          }}
+        >
+          <span style={{ color: colors.primary, fontWeight: 800 }}>Never forget</span> who has your stuff
+        </div>
+
+        <div style={{ width: "100%", maxWidth: 320, marginTop: 34 }}>
+          <div style={{ fontFamily: "'Anton', sans-serif", fontSize: 16, letterSpacing: 0.3, marginBottom: 4 }}>
+            SIGN IN
+          </div>
+          <div style={{ fontSize: 12.5, color: colors.muted, marginBottom: 18 }}>
+            Enter your email and a password. New here? We'll set up your account automatically — use the same email you paid with.
+          </div>
+
+          <Field label="Email">
+            <div style={{ position: "relative" }}>
+              <Mail size={15} color={colors.muted} style={{ position: "absolute", left: 12, top: 12.5 }} />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                style={{ ...authInputStyle(colors), paddingLeft: 32 }}
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="email"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submit();
+                }}
+              />
+            </div>
+          </Field>
+
+          <Field label="Password">
+            <div style={{ position: "relative" }}>
+              <Lock size={15} color={colors.muted} style={{ position: "absolute", left: 12, top: 12.5 }} />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 4 characters"
+                style={{ ...authInputStyle(colors), paddingLeft: 32 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submit();
+                }}
+              />
+            </div>
+          </Field>
+
+          {displayError && (
+            <div style={{ fontSize: 12.5, color: "#ff8a8a", marginBottom: 12, marginTop: -4 }}>{displayError}</div>
+          )}
+
+          <button
+            onClick={submit}
+            disabled={busy || !canSubmit}
+            style={{
+              width: "100%",
+              marginTop: 6,
+              padding: "14px 0",
+              borderRadius: 14,
+              background: colors.primary,
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: 14.5,
+              opacity: busy || !canSubmit ? 0.65 : 1,
+            }}
+          >
+            {busy ? "Please wait…" : "Sign in"}
+          </button>
+
+          <div style={{ fontSize: 11, color: colors.mutedDark, marginTop: 14, textAlign: "center", lineHeight: 1.5 }}>
+            Existing email? We'll check your password. New one? It's yours from now on.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================= MAIN APP ================= */
+export default function LendlyApp() {
+  useFonts();
+  const [items, setItems] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [tab, setTab] = useState("active"); // active | returned
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [detailId, setDetailId] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [themeName, setThemeName] = useState("dark");
+  const [themeLoaded, setThemeLoaded] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const colors = THEMES[themeName];
+
+  /* ---------- Auth (Supabase-backed accounts) ---------- */
+  const [authLoaded, setAuthLoaded] = useState(false);
+  const [account, setAccount] = useState(null); // { email, has_access }
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
+
+  useEffect(() => {
+    // Every fresh visit always starts at sign-in — no auto-login from a
+    // saved session, so a shared/public computer never shows the last
+    // person's email or account without them typing their password again.
+    setAuthLoaded(true);
+  }, []);
+
+  async function signInOrUp(email, password) {
+    setAuthError("");
+    if (!isEmail(email)) {
+      setAuthError("Enter a valid email address.");
+      return;
+    }
+    setAuthBusy(true);
+    try {
+      const emailLower = email.toLowerCase();
+      const passwordHash = await hashPassword(password);
+      const exists = await supabaseAccountExists(emailLower);
+
+      if (exists) {
+        const acc = await supabaseLogIn(emailLower, passwordHash);
+        if (!acc) {
+          setAuthError("Wrong password for that email. Try again.");
+          setAuthBusy(false);
+          return;
+        }
+        setAccount(acc);
+        setHasAccess(!!acc.has_access);
+        setLoggedIn(true);
+      } else {
+        const created = await supabaseSignUp(emailLower, passwordHash);
+        setAccount(created);
+        setHasAccess(!!created.has_access);
+        setLoggedIn(true);
+      }
+    } catch (e) {
+      setAuthError(`Couldn't reach the server: ${e.message || e}`);
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function checkPayment() {
+    if (!account) return "You need to be signed in first.";
+    try {
+      const updated = await supabaseCheckPayment(account.email);
+      setAccount(updated);
+      setHasAccess(!!updated.has_access);
+      if (!updated.has_access) {
+        return "We don't see a payment for this email yet. Pay above, then check again.";
+      }
+      return null;
+    } catch (e) {
+      return `Couldn't reach the server: ${e.message || e}`;
+    }
+  }
+
+  async function logOut() {
+    setMenuOpen(false);
+    setLoggedIn(false);
+  }
+
+  const itemsKey = account ? `lendly-items:${account.email}` : null;
+  const historyKey = account ? `lendly-history:${account.email}` : null;
+
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await window.storage.get("lendly-theme", false);
+        if (!cancelled && res && (res.value === "dark" || res.value === "light")) {
+          setThemeName(res.value);
+        }
+      } catch (e) {
+        // no saved preference — default stands
+      } finally {
+        if (!cancelled) setThemeLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!themeLoaded) return;
+    (async () => {
+      try {
+        await window.storage.set("lendly-theme", themeName, false);
+      } catch (e) {
+        // theme just won't persist — not critical
+      }
+    })();
+  }, [themeName, themeLoaded]);
+
+  function toggleTheme() {
+    setThemeName((t) => (t === "dark" ? "light" : "dark"));
+  }
+
+  useEffect(() => {
+    if (!itemsKey) return;
+    let cancelled = false;
+    setLoaded(false);
+    (async () => {
+      try {
+        const res = await window.storage.get(itemsKey, false);
+        if (!cancelled) setItems(res && res.value ? JSON.parse(res.value) : []);
+      } catch (e) {
+        if (!cancelled) setItems([]);
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [itemsKey]);
+
+  useEffect(() => {
+    if (!loaded || !itemsKey) return;
+    (async () => {
+      try {
+        const res = await window.storage.set(itemsKey, JSON.stringify(items), false);
+        setSaveError(!res);
+      } catch (e) {
+        setSaveError(true);
+      }
+    })();
+  }, [items, loaded, itemsKey]);
+
+  useEffect(() => {
+    if (!historyKey) return;
+    let cancelled = false;
+    setHistoryLoaded(false);
+    (async () => {
+      try {
+        const res = await window.storage.get(historyKey, false);
+        if (!cancelled) setHistory(res && res.value ? JSON.parse(res.value) : []);
+      } catch (e) {
+        if (!cancelled) setHistory([]);
+      } finally {
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [historyKey]);
+
+  useEffect(() => {
+    if (!historyLoaded || !historyKey) return;
+    (async () => {
+      try {
+        await window.storage.set(historyKey, JSON.stringify(history), false);
+      } catch (e) {
+        // history just won't persist — not critical
+      }
+    })();
+  }, [history, historyLoaded, historyKey]);
+
+  function logEvent(type, item) {
+    setHistory((prev) => [
+      { id: uid(), type, itemName: item.name, borrower: item.borrower, cost: item.cost, timestamp: new Date().toISOString() },
+      ...prev,
+    ].slice(0, 300));
+  }
+
+  const active = items.filter((i) => !i.returned).sort((a, b) => new Date(b.dateLent) - new Date(a.dateLent));
+  const returned = items.filter((i) => i.returned).sort((a, b) => new Date(b.dateReturned) - new Date(a.dateReturned));
+  const totalValue = active.reduce((sum, i) => sum + (parseFloat(i.cost) || 0), 0);
+
+  function saveItem(data) {
+    if (editingId) {
+      setItems((prev) => prev.map((i) => (i.id === editingId ? { ...i, ...data } : i)));
+      logEvent("edited", data);
+    } else {
+      setItems((prev) => [
+        ...prev,
+        { id: uid(), returned: false, dateLent: new Date().toISOString(), ...data },
+      ]);
+      // note: data.dateLent (from the form) overrides the default above
+      logEvent("lent", data);
+    }
+    setShowForm(false);
+    setEditingId(null);
+  }
+
+  function markReturned(id) {
+    const item = items.find((i) => i.id === id);
+    setItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, returned: true, dateReturned: new Date().toISOString() } : i))
+    );
+    if (item) logEvent("returned", item);
+    setDetailId(null);
+  }
+
+  function markActive(id) {
+    const item = items.find((i) => i.id === id);
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, returned: false, dateReturned: null } : i)));
+    if (item) logEvent("relent", item);
+  }
+
+  function deleteItem(id) {
+    const item = items.find((i) => i.id === id);
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    if (item) logEvent("deleted", item);
+    setDetailId(null);
+  }
+
+  const editingItem = items.find((i) => i.id === editingId) || null;
+  const detailItem = items.find((i) => i.id === detailId) || null;
+
+  return (
+    <ColorContext.Provider value={colors}>
+    <div
+      style={{
+        fontFamily: "'Inter', sans-serif",
+        background: colors.bg,
+        minHeight: "100vh",
+        color: colors.text,
+        display: "flex",
+        justifyContent: "center",
+        transition: "background 0.25s ease, color 0.25s ease",
+      }}
+    >
+      <div style={{ width: "100%", maxWidth: 440, position: "relative", minHeight: "100vh" }}>
+      {!authLoaded ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+          <LendlyLogo size={40} />
+        </div>
+      ) : !loggedIn ? (
+        <AuthScreen
+          busy={authBusy}
+          error={authError}
+          onSubmit={signInOrUp}
+          clearError={() => setAuthError("")}
+          themeName={themeName}
+          toggleTheme={toggleTheme}
+        />
+      ) : !hasAccess ? (
+        <Paywall themeName={themeName} toggleTheme={toggleTheme} onCheckPayment={checkPayment} accountEmail={account?.email} onBack={logOut} />
+      ) : (
+        <>
+        {/* ---------- HERO ---------- */}
+        <div style={{ padding: "28px 20px 22px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <LendlyLogo />
+              <div>
+                <div style={{ fontFamily: "'Anton', sans-serif", fontSize: 20, letterSpacing: 0.5, lineHeight: 1 }}>
+                  LENDLY
+                </div>
+                <div
+                  style={{
+                    fontSize: 9.5,
+                    letterSpacing: 1,
+                    color: colors.muted,
+                    marginTop: 3,
+                    textTransform: "uppercase",
+                    fontWeight: 600,
+                  }}
+                >
+                  <span style={{ color: colors.primary, fontWeight: 800 }}>Never forget</span> who has your stuff
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                onClick={toggleTheme}
+                aria-label={themeName === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+                title={themeName === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 10,
+                  background: colors.surface,
+                  border: `1px solid ${colors.border}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {themeName === "dark" ? (
+                  <Sun size={16} color={colors.muted} />
+                ) : (
+                  <Moon size={16} color={colors.muted} />
+                )}
+              </button>
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Menu"
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 10,
+                  background: colors.surface,
+                  border: `1px solid ${colors.border}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <MoreVertical size={17} color={colors.muted} />
+              </button>
+              {menuOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    right: 0,
+                    top: 40,
+                    background: colors.surfaceRaised,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 12,
+                    padding: 6,
+                    width: 180,
+                    zIndex: 30,
+                    boxShadow: "0 12px 30px rgba(0,0,0,0.5)",
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      setShowHistory(true);
+                      setMenuOpen(false);
+                    }}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "9px 10px",
+                      borderRadius: 8,
+                      color: colors.text,
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <History size={14} /> View history
+                  </button>
+                  <button
+                    onClick={logOut}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "9px 10px",
+                      borderRadius: 8,
+                      color: colors.text,
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <LogOut size={14} /> Log out {account ? `(${account.email})` : ""}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setConfirmClear(true);
+                      setMenuOpen(false);
+                    }}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "9px 10px",
+                      borderRadius: 8,
+                      color: "#ff6b6b",
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <Trash2 size={14} /> Clear all data
+                  </button>
+                </div>
+              )}
+            </div>
+            </div>
+          </div>
+
+          {/* Poster-style typographic banner */}
+          <div style={{ marginTop: 22, fontFamily: "'Anton', sans-serif", lineHeight: 0.94 }}>
+            <div style={{ fontSize: 30, color: colors.heroText, letterSpacing: 0.5 }}>LEND IT.</div>
+            <div style={{ fontSize: 30, color: colors.primary, letterSpacing: 0.5, marginTop: 2 }}>TRACK IT.</div>
+            <div style={{ position: "relative", display: "inline-block", marginTop: 8 }}>
+              <BrushStroke style={{ transform: "scale(1.08, 1.35)", zIndex: 0 }} />
+              <span
+                style={{
+                  position: "relative",
+                  zIndex: 1,
+                  fontSize: 30,
+                  color: colors.bg,
+                  letterSpacing: 0.5,
+                  padding: "2px 14px",
+                  display: "inline-block",
+                }}
+              >
+                GET IT BACK.
+              </span>
+            </div>
+          </div>
+
+          {/* Stats row — mirrors the three-icon poster row, now functional */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 10,
+              marginTop: 24,
+            }}
+          >
+            <StatPill icon={<Users size={16} color={colors.primary} />} value={active.length} label="items out" />
+            <StatPill
+              icon={<DollarSign size={16} color="#6fa8ff" />}
+              value={active.length ? `$${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "$0"}
+              label="out on loan"
+            />
+            <StatPill icon={<CheckCircle2 size={16} color={colors.green} />} value={returned.length} label="got back" />
+          </div>
+        </div>
+
+        {/* ---------- TABS ---------- */}
+        <div style={{ display: "flex", gap: 6, padding: "0 20px", marginTop: 4 }}>
+          <TabButton active={tab === "active"} onClick={() => setTab("active")} label={`Out (${active.length})`} />
+          <TabButton active={tab === "returned"} onClick={() => setTab("returned")} label={`Returned (${returned.length})`} />
+        </div>
+
+        {/* ---------- LIST ---------- */}
+        <div style={{ padding: "16px 20px 110px" }}>
+          {!loaded ? (
+            <div style={{ textAlign: "center", color: colors.mutedDark, padding: "40px 0", fontSize: 13 }}>
+              Loading your loans…
+            </div>
+          ) : tab === "active" ? (
+            active.length === 0 ? (
+              <EmptyState
+                title="Nothing out right now"
+                body="Lend something and log it here so you never lose track of who has it."
+                cta="Log a lent item"
+                onCta={() => setShowForm(true)}
+              />
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {active.map((item) => (
+                  <ItemCard key={item.id} item={item} onOpen={() => setDetailId(item.id)} />
+                ))}
+              </div>
+            )
+          ) : returned.length === 0 ? (
+            <EmptyState
+              title="No returns yet"
+              body="Once you mark an item as back in your hands, it'll show up here."
+            />
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {returned.map((item) => (
+                <ItemCard key={item.id} item={item} onOpen={() => setDetailId(item.id)} returned />
+              ))}
+            </div>
+          )}
+
+          {saveError && (
+            <div style={{ marginTop: 14, fontSize: 12, color: "#ff8a8a", textAlign: "center" }}>
+              Couldn't save changes. They may not persist.
+            </div>
+          )}
+        </div>
+
+        {/* ---------- FAB ---------- */}
+        <button
+          onClick={() => {
+            setEditingId(null);
+            setShowForm(true);
+          }}
+          style={{
+            position: "fixed",
+            bottom: 26,
+            right: "50%",
+            transform: "translateX(-50%)",
+            marginRight: -190,
+            width: 58,
+            height: 58,
+            borderRadius: 18,
+            background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryLight})`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: `0 10px 30px ${colors.primarySoft}`,
+            zIndex: 20,
+          }}
+          aria-label="Add lent item"
+        >
+          <Plus size={26} color="#fff" strokeWidth={2.4} />
+        </button>
+
+        {/* ---------- ADD/EDIT FORM ---------- */}
+        {showForm && (
+          <ItemForm
+            initial={editingItem}
+            onCancel={() => {
+              setShowForm(false);
+              setEditingId(null);
+            }}
+            onSave={saveItem}
+          />
+        )}
+
+        {/* ---------- DETAIL ---------- */}
+        {detailItem && (
+          <DetailView
+            item={detailItem}
+            onClose={() => setDetailId(null)}
+            onEdit={() => {
+              setEditingId(detailItem.id);
+              setDetailId(null);
+              setShowForm(true);
+            }}
+            onDelete={() => deleteItem(detailItem.id)}
+            onMarkReturned={() => markReturned(detailItem.id)}
+            onMarkActive={() => markActive(detailItem.id)}
+          />
+        )}
+
+        {/* ---------- HISTORY ---------- */}
+        {showHistory && (
+          <HistoryView events={history} onClose={() => setShowHistory(false)} />
+        )}
+
+        {/* ---------- CLEAR CONFIRM ---------- */}
+        {confirmClear && (
+          <ConfirmDialog
+            title="Clear all data?"
+            body="This deletes every lent item and your entire history log. This can't be undone."
+            confirmLabel="Clear everything"
+            onCancel={() => setConfirmClear(false)}
+            onConfirm={() => {
+              setItems([]);
+              setHistory([]);
+              setConfirmClear(false);
+            }}
+          />
+        )}
+        </>
+      )}
+      </div>
+    </div>
+    </ColorContext.Provider>
+  );
+}
+
+/* ---------- Small building blocks ---------- */
+
+function StatPill({ icon, value, label }) {
+  const colors = useColors();
+  return (
+    <div
+      style={{
+        background: colors.surface,
+        border: `1px solid ${colors.border}`,
+        borderRadius: 14,
+        padding: "12px 8px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 6,
+      }}
+    >
+      {icon}
+      <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 9.5, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.6, textAlign: "center" }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, label }) {
+  const colors = useColors();
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1,
+        padding: "10px 0",
+        borderRadius: 11,
+        fontSize: 13,
+        fontWeight: 700,
+        background: active ? colors.primarySoft : "transparent",
+        color: active ? colors.primary : colors.muted,
+        border: active ? `1px solid ${colors.primaryDim}` : "1px solid transparent",
+        transition: "all 0.15s",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function EmptyState({ title, body, cta, onCta }) {
+  const colors = useColors();
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        padding: "48px 20px",
+        border: `1px dashed ${colors.border}`,
+        borderRadius: 18,
+      }}
+    >
+      <div
+        style={{
+          width: 46,
+          height: 46,
+          borderRadius: 14,
+          background: colors.surface,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "0 auto 14px",
+        }}
+      >
+        <Package size={22} color={colors.mutedDark} />
+      </div>
+      <div style={{ fontWeight: 800, fontSize: 15 }}>{title}</div>
+      <div style={{ fontSize: 13, color: colors.muted, marginTop: 6, lineHeight: 1.5 }}>{body}</div>
+      {cta && (
+        <button
+          onClick={onCta}
+          style={{
+            marginTop: 16,
+            background: colors.primary,
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 700,
+            padding: "10px 18px",
+            borderRadius: 11,
+          }}
+        >
+          {cta}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ItemCard({ item, onOpen, returned }) {
+  const colors = useColors();
+  const cost = formatCost(item.cost);
+  const overdue = isOverdue(item);
+  return (
+    <button
+      onClick={onOpen}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        background: colors.surface,
+        border: `1px solid ${colors.border}`,
+        borderRadius: 16,
+        padding: 12,
+        textAlign: "left",
+        opacity: returned ? 0.75 : 1,
+      }}
+    >
+      <Thumb src={item.photo} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 14.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {item.name}
+        </div>
+        <div style={{ fontSize: 12.5, color: colors.muted, marginTop: 2 }}>
+          Lent to <span style={{ color: colors.text, fontWeight: 600 }}>{item.borrower}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 5 }}>
+          {cost && (
+            <span style={{ fontSize: 11.5, color: colors.accentBlue, fontWeight: 700 }}>{cost}</span>
+          )}
+          <span style={{ fontSize: 11, color: overdue ? "#ff8a8a" : colors.mutedDark, display: "flex", alignItems: "center", gap: 3, fontWeight: overdue ? 700 : 400 }}>
+            <Clock size={11} />
+            {returned ? "Returned" : overdue ? `Overdue · due ${formatDatePretty(item.returnBy)}` : timeSince(item.dateLent)}
+          </span>
+        </div>
+      </div>
+      {returned ? (
+        <CheckCircle2 size={18} color={colors.green} />
+      ) : (
+        <div style={{ width: 8, height: 8, borderRadius: 99, background: overdue ? "#ff6b6b" : colors.primary, flexShrink: 0 }} />
+      )}
+    </button>
+  );
+}
+
+/* ---------- Sheet wrapper ---------- */
+function Sheet({ children, onClose }) {
+  const colors = useColors();
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: colors.overlay,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "flex-end",
+        zIndex: 40,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 440,
+          maxHeight: "92vh",
+          overflowY: "auto",
+          background: colors.bg,
+          borderRadius: "22px 22px 0 0",
+          border: `1px solid ${colors.border}`,
+          borderBottom: "none",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Add / Edit form ---------- */
+function ItemForm({ initial, onCancel, onSave }) {
+  const colors = useColors();
+  const [name, setName] = useState(initial?.name || "");
+  const [photo, setPhoto] = useState(initial?.photo || null);
+  const [borrower, setBorrower] = useState(initial?.borrower || "");
+  const [contact, setContact] = useState(initial?.contact || "");
+  const [cost, setCost] = useState(initial?.cost || "");
+  const [notes, setNotes] = useState(initial?.notes || "");
+  const [dateLent, setDateLent] = useState(toDateInputValue(initial?.dateLent) || todayInputValue());
+  const [returnBy, setReturnBy] = useState(toDateInputValue(initial?.returnBy));
+  const [dateError, setDateError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const dataUrl = await compressImage(file);
+      setPhoto(dataUrl);
+    } catch (err) {
+      // ignore silently, user can retry
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const valid = name.trim() && borrower.trim() && dateLent;
+
+  function submit() {
+    if (!valid) return;
+    if (returnBy && returnBy < dateLent) {
+      setDateError("Return date can't be before the lent date.");
+      return;
+    }
+    setDateError("");
+    onSave({
+      name: name.trim(),
+      photo,
+      borrower: borrower.trim(),
+      contact: contact.trim(),
+      cost: cost === "" ? null : cost,
+      notes: notes.trim(),
+      dateLent: new Date(dateLent + "T12:00:00").toISOString(),
+      returnBy: returnBy ? new Date(returnBy + "T12:00:00").toISOString() : null,
+    });
+  }
+
+  const inputStyle = {
+    width: "100%",
+    background: colors.surface,
+    border: `1px solid ${colors.border}`,
+    borderRadius: 12,
+    padding: "12px 12px",
+    color: colors.text,
+    fontSize: 14,
+    outline: "none",
+    colorScheme: colors.id === "dark" ? "dark" : "light",
+  };
+
+  return (
+    <Sheet onClose={onCancel}>
+      <div style={{ padding: "18px 20px 30px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+          <button onClick={onCancel} style={{ display: "flex", alignItems: "center", gap: 4, color: colors.muted, fontSize: 13.5 }}>
+            <X size={18} /> Cancel
+          </button>
+          <div style={{ fontFamily: "'Anton', sans-serif", fontSize: 15, letterSpacing: 0.4 }}>
+            {initial ? "EDIT ITEM" : "LEND AN ITEM"}
+          </div>
+          <div style={{ width: 54 }} />
+        </div>
+
+        {/* Photo picker */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 22 }}>
+          <button
+            onClick={() => fileRef.current?.click()}
+            style={{
+              width: 96,
+              height: 96,
+              borderRadius: 22,
+              background: colors.surface,
+              border: `1.5px dashed ${photo ? colors.primary : colors.border}`,
+              overflow: "hidden",
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {photo ? (
+              <img src={photo} alt="Item" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : uploading ? (
+              <span style={{ fontSize: 11, color: colors.muted }}>Loading…</span>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                <Camera size={22} color={colors.muted} />
+                <span style={{ fontSize: 10.5, color: colors.muted }}>Add photo</span>
+              </div>
+            )}
+            {photo && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  right: 0,
+                  width: 26,
+                  height: 26,
+                  background: colors.primary,
+                  borderRadius: "10px 0 0 0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Camera size={13} color="#fff" />
+              </div>
+            )}
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
+        </div>
+
+        <Field label="Item name">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Drill, camera lens, board game"
+            style={inputStyle}
+          />
+        </Field>
+
+        <Field label="Lent to">
+          <input
+            value={borrower}
+            onChange={(e) => setBorrower(e.target.value)}
+            placeholder="Their name"
+            style={inputStyle}
+          />
+        </Field>
+
+        <Field label="Their contact info">
+          <input
+            value={contact}
+            onChange={(e) => setContact(e.target.value)}
+            placeholder="Phone number or email"
+            style={inputStyle}
+          />
+        </Field>
+
+        <Field label="Estimated value (optional)">
+          <div style={{ position: "relative" }}>
+            <DollarSign size={15} color={colors.muted} style={{ position: "absolute", left: 12, top: 12.5 }} />
+            <input
+              value={cost}
+              onChange={(e) => setCost(e.target.value.replace(/[^0-9.]/g, ""))}
+              placeholder="0"
+              inputMode="decimal"
+              style={{ ...inputStyle, paddingLeft: 32 }}
+            />
+          </div>
+        </Field>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <Field label="Date lent">
+              <input
+                type="date"
+                value={dateLent}
+                onChange={(e) => {
+                  setDateLent(e.target.value);
+                  setDateError("");
+                }}
+                max={todayInputValue()}
+                style={inputStyle}
+              />
+            </Field>
+          </div>
+          <div style={{ flex: 1 }}>
+            <Field label="Return by (optional)">
+              <input
+                type="date"
+                value={returnBy}
+                onChange={(e) => {
+                  setReturnBy(e.target.value);
+                  setDateError("");
+                }}
+                min={dateLent || undefined}
+                style={inputStyle}
+              />
+            </Field>
+          </div>
+        </div>
+        {dateError && (
+          <div style={{ fontSize: 12, color: "#ff8a8a", marginTop: -8, marginBottom: 14 }}>{dateError}</div>
+        )}
+
+        <Field label="Notes (optional)">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Condition, when you need it back, anything else"
+            rows={3}
+            style={{ ...inputStyle, resize: "none", fontFamily: "inherit" }}
+          />
+        </Field>
+
+        <button
+          onClick={submit}
+          disabled={!valid}
+          style={{
+            width: "100%",
+            marginTop: 8,
+            padding: "14px 0",
+            borderRadius: 14,
+            background: valid ? colors.primary : colors.surfaceRaised,
+            color: valid ? "#fff" : colors.mutedDark,
+            fontWeight: 800,
+            fontSize: 14.5,
+          }}
+        >
+          {initial ? "Save changes" : "Log this loan"}
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+function Field({ label, children }) {
+  const colors = useColors();
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11.5, color: colors.muted, fontWeight: 700, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/* ---------- Detail view ---------- */
+function DetailView({ item, onClose, onEdit, onDelete, onMarkReturned, onMarkActive }) {
+  const colors = useColors();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const cost = formatCost(item.cost);
+  const href = contactHref(item.contact);
+  const overdue = isOverdue(item);
+
+  return (
+    <Sheet onClose={onClose}>
+      <div style={{ padding: "18px 20px 30px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <button onClick={onClose} style={{ display: "flex", alignItems: "center", gap: 4, color: colors.muted, fontSize: 13.5 }}>
+            <ChevronLeft size={18} /> Back
+          </button>
+          <div style={{ display: "flex", gap: 14 }}>
+            <button onClick={onEdit} aria-label="Edit" style={{ color: colors.muted }}>
+              <Pencil size={17} />
+            </button>
+            <button onClick={() => setConfirmDelete(true)} aria-label="Delete" style={{ color: "#ff6b6b" }}>
+              <Trash2 size={17} />
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+          <Thumb src={item.photo} size={120} radius={26} />
+        </div>
+
+        <div style={{ textAlign: "center", marginBottom: 4 }}>
+          <div style={{ fontFamily: "'Anton', sans-serif", fontSize: 22, letterSpacing: 0.3 }}>{item.name}</div>
+          {item.returned ? (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, background: colors.greenSoft, color: colors.green, fontSize: 11.5, fontWeight: 700, padding: "4px 10px", borderRadius: 99 }}>
+              <CheckCircle2 size={12} /> Back in your hands
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: colors.mutedDark, marginTop: 6 }}>
+              Lent {new Date(item.dateLent).toLocaleDateString()} · {timeSince(item.dateLent)}
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+          <DetailRow icon={<Users size={16} color={colors.primary} />} label="Lent to" value={item.borrower} />
+          <DetailRow
+            icon={href && isEmail(item.contact) ? <Mail size={16} color={colors.primary} /> : <Phone size={16} color={colors.primary} />}
+            label="Contact"
+            value={item.contact || "—"}
+            href={href}
+          />
+          <DetailRow icon={<Clock size={16} color={colors.primary} />} label="Date lent" value={formatDatePretty(item.dateLent) || "Not set"} />
+          {item.returnBy && (
+            <DetailRow
+              icon={<Clock size={16} color={overdue ? "#ff6b6b" : colors.primary} />}
+              label="Return by"
+              value={overdue ? `${formatDatePretty(item.returnBy)} · Overdue` : formatDatePretty(item.returnBy)}
+              warn={overdue}
+            />
+          )}
+          <DetailRow icon={<DollarSign size={16} color={colors.primary} />} label="Estimated value" value={cost || "Not set"} />
+          {item.notes && <DetailRow icon={<Pencil size={16} color={colors.primary} />} label="Notes" value={item.notes} multiline />}
+          {item.returned && item.dateReturned && (
+            <DetailRow icon={<Clock size={16} color={colors.primary} />} label="Returned" value={new Date(item.dateReturned).toLocaleDateString()} />
+          )}
+        </div>
+
+        <div style={{ marginTop: 26 }}>
+          {item.returned ? (
+            <button
+              onClick={onMarkActive}
+              style={{ width: "100%", padding: "14px 0", borderRadius: 14, background: colors.surfaceRaised, color: colors.text, fontWeight: 800, fontSize: 14 }}
+            >
+              Mark as lent out again
+            </button>
+          ) : (
+            <button
+              onClick={onMarkReturned}
+              style={{
+                width: "100%",
+                padding: "14px 0",
+                borderRadius: 14,
+                background: colors.green,
+                color: "#07120c",
+                fontWeight: 800,
+                fontSize: 14.5,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 7,
+              }}
+            >
+              <Check size={17} strokeWidth={3} /> Got it back
+            </button>
+          )}
+        </div>
+      </div>
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title={`Delete "${item.name}"?`}
+          body="This removes it from Lendly for good."
+          confirmLabel="Delete"
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={onDelete}
+        />
+      )}
+    </Sheet>
+  );
+}
+
+function DetailRow({ icon, label, value, href, multiline, warn }) {
+  const colors = useColors();
+  const content = (
+    <div style={{ display: "flex", gap: 12, background: warn ? "rgba(255,107,107,0.08)" : colors.surface, border: `1px solid ${warn ? "rgba(255,107,107,0.35)" : colors.border}`, borderRadius: 14, padding: "12px 14px" }}>
+      <div style={{ width: 30, height: 30, borderRadius: 9, background: warn ? "rgba(255,107,107,0.16)" : colors.primarySoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {icon}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 10.5, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>{label}</div>
+        <div style={{ fontSize: 14, marginTop: 2, color: warn ? "#ff8a8a" : href ? colors.primary : colors.text, fontWeight: 600, whiteSpace: multiline ? "pre-wrap" : "nowrap", overflow: multiline ? "visible" : "hidden", textOverflow: "ellipsis", lineHeight: 1.4 }}>
+          {value}
+        </div>
+      </div>
+    </div>
+  );
+  return href ? <a href={href} style={{ display: "block" }}>{content}</a> : content;
+}
+
+/* ---------- History ---------- */
+const EVENT_META = {
+  lent: { label: "Lent to", icon: HandCoins, tone: "primary" },
+  returned: { label: "Got back from", icon: CheckCircle2, tone: "green" },
+  relent: { label: "Lent to", icon: RotateCcw, tone: "primary" },
+  edited: { label: "Edited loan for", icon: Pencil, tone: "muted" },
+  deleted: { label: "Deleted loan for", icon: Trash2, tone: "danger" },
+};
+
+function HistoryView({ events, onClose }) {
+  const colors = useColors();
+  const groups = [];
+  const seen = new Map();
+  for (const ev of events) {
+    const label = dayGroupLabel(ev.timestamp);
+    if (!seen.has(label)) {
+      seen.set(label, []);
+      groups.push(label);
+    }
+    seen.get(label).push(ev);
+  }
+
+  return (
+    <Sheet onClose={onClose}>
+      <div style={{ padding: "18px 20px 30px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+          <button onClick={onClose} style={{ display: "flex", alignItems: "center", gap: 4, color: colors.muted, fontSize: 13.5 }}>
+            <ChevronLeft size={18} /> Back
+          </button>
+          <div style={{ fontFamily: "'Anton', sans-serif", fontSize: 15, letterSpacing: 0.4 }}>HISTORY</div>
+          <div style={{ width: 54 }} />
+        </div>
+
+        {events.length === 0 ? (
+          <EmptyState title="No activity yet" body="Every loan, return, and edit you make will show up here." />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+            {groups.map((label) => (
+              <div key={label}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 }}>
+                  {label}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {seen.get(label).map((ev) => (
+                    <HistoryRow key={ev.id} event={ev} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
+function HistoryRow({ event }) {
+  const colors = useColors();
+  const meta = EVENT_META[event.type] || EVENT_META.lent;
+  const Icon = meta.icon;
+  const toneColor =
+    meta.tone === "green" ? colors.green : meta.tone === "danger" ? "#ff6b6b" : meta.tone === "muted" ? colors.muted : colors.primary;
+  const toneBg =
+    meta.tone === "green" ? colors.greenSoft : meta.tone === "danger" ? "rgba(255,107,107,0.14)" : meta.tone === "muted" ? colors.surfaceRaised : colors.primarySoft;
+  const cost = formatCost(event.cost);
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 14, padding: "11px 13px" }}>
+      <div style={{ width: 32, height: 32, borderRadius: 10, background: toneBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Icon size={15} color={toneColor} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: colors.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {meta.label} <span style={{ fontWeight: 700 }}>{event.borrower || "—"}</span>
+        </div>
+        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {event.itemName}
+          {cost ? ` · ${cost}` : ""}
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: colors.mutedDark, flexShrink: 0 }}>{relativeTime(event.timestamp)}</div>
+    </div>
+  );
+}
+
+/* ---------- Confirm dialog ---------- */
+function ConfirmDialog({ title, body, confirmLabel, onCancel, onConfirm }) {
+  const colors = useColors();
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: colors.overlayStrong, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 24 }}
+      onClick={onCancel}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: "100%", maxWidth: 320, background: colors.surfaceRaised, border: `1px solid ${colors.border}`, borderRadius: 18, padding: 22 }}
+      >
+        <div style={{ fontWeight: 800, fontSize: 15.5 }}>{title}</div>
+        <div style={{ fontSize: 13, color: colors.muted, marginTop: 8, lineHeight: 1.5 }}>{body}</div>
+        <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+          <button onClick={onCancel} style={{ flex: 1, padding: "11px 0", borderRadius: 11, background: colors.surface, color: colors.text, fontWeight: 700, fontSize: 13.5 }}>
+            Cancel
+          </button>
+          <button onClick={onConfirm} style={{ flex: 1, padding: "11px 0", borderRadius: 11, background: "#ff6b6b", color: "#1a0000", fontWeight: 800, fontSize: 13.5 }}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const rootEl = document.getElementById("root");
+const root = ReactDOM.createRoot(rootEl);
+root.render(React.createElement(LendlyApp));
+
+</script>
+</body>
+</html>
