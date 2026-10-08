@@ -4,13 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
 <title>Lendly — Never forget who has your stuff</title>
+<meta name="description" content="Track everything you lend out: who has it, their contact info, what it's worth, and when it's due back." />
 <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
 <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
 <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-<meta name="description" content="Track everything you lend out: who has it, their contact info, what it's worth, and when it's due back." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <style>
@@ -705,7 +705,7 @@ function AuthScreen({ busy, error, onSubmit, clearError, themeName, toggleTheme 
             SIGN IN
           </div>
           <div style={{ fontSize: 12.5, color: colors.muted, marginBottom: 18 }}>
-            Enter your email and a password. New here? We'll set up your account automatically — use the same email you paid with.
+            Enter your email and a password. New here? Create an account with your email and password. We'll set you up.
           </div>
 
           <Field label="Email">
@@ -767,6 +767,18 @@ function AuthScreen({ busy, error, onSubmit, clearError, themeName, toggleTheme 
 
           <div style={{ fontSize: 11, color: colors.mutedDark, marginTop: 14, textAlign: "center", lineHeight: 1.5 }}>
             Existing email? We'll check your password. New one? It's yours from now on.
+          </div>
+
+          <div style={{ fontSize: 10.5, color: colors.mutedDark, marginTop: 20, textAlign: "center", lineHeight: 1.6 }}>
+            By continuing, you agree to our{" "}
+            <a href="/terms.html" style={{ color: colors.muted, textDecoration: "underline" }}>
+              Terms
+            </a>{" "}
+            and{" "}
+            <a href="/privacy.html" style={{ color: colors.muted, textDecoration: "underline" }}>
+              Privacy Policy
+            </a>
+            .
           </div>
         </div>
       </div>
