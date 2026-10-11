@@ -1,0 +1,567 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Personal Lending Tracker App — Remember Who Has Your Stuff | Lendly</title>
+<meta name="description" content="Forgetting items lent to friends? Lendly is your personal lending tracker to remember what you lent, who borrowed it, contact details, item values and return dates.">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#07070a">
+<link rel="canonical" href="https://getlendlyapp.com/track-items-you-lend.html">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Lendly — Your Personal Lending Tracker">
+<meta property="og:description" content="Keep track of things you lend to friends, who borrowed them, and when they're due back.">
+<meta property="og:url" content="https://getlendlyapp.com/track-items-you-lend.html">
+<meta property="og:site_name" content="Lendly">
+
+<style>
+:root {
+  --bg: #07070a;
+  --surface: #131319;
+  --primary: #5b4feb;
+  --primary-hover: #7165ff;
+  --text: #f5f5f7;
+  --muted: #b4b4c3;
+  --border: #292833;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  line-height: 1.8;
+}
+
+a { color: #aaa0ff; }
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px max(5%, calc((100% - 1000px) / 2));
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  color: white;
+  text-decoration: none;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -1px;
+}
+
+.logo span { color: #8d80ff; }
+
+.nav-link {
+  text-decoration: none;
+  font-weight: 750;
+}
+
+.container {
+  width: min(800px, 90%);
+  margin: auto;
+}
+
+.breadcrumb {
+  padding-top: 24px;
+  font-size: .9rem;
+  color: var(--muted);
+}
+
+.breadcrumb a { text-decoration: none; }
+
+.hero { padding: 65px 0 45px; }
+
+.eyebrow {
+  display: inline-block;
+  padding: 5px 12px;
+  border: 1px solid #39305f;
+  border-radius: 50px;
+  color: #bdb4ff;
+  background: #171329;
+  font-size: .8rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 20px 0;
+  font-size: clamp(2.3rem, 7vw, 3.8rem);
+  line-height: 1.12;
+  letter-spacing: -2px;
+}
+
+h2 {
+  margin-top: 48px;
+  font-size: 1.75rem;
+  line-height: 1.3;
+  letter-spacing: -.5px;
+}
+
+h3 {
+  margin-top: 28px;
+  font-size: 1.15rem;
+  line-height: 1.4;
+}
+
+p, li {
+  color: #c9c9d5;
+  font-size: 1.02rem;
+}
+
+.intro {
+  color: #e0dfea;
+  font-size: 1.17rem;
+}
+
+strong { color: #fff; }
+
+.cta {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 13px 22px;
+  border-radius: 11px;
+  background: var(--primary);
+  color: white;
+  text-decoration: none;
+  font-weight: 800;
+  transition: background .2s, transform .2s;
+}
+
+.cta:hover {
+  background: var(--primary-hover);
+  transform: translateY(-2px);
+}
+
+.panel {
+  margin: 32px 0;
+  padding: 25px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.panel h2 { margin-top: 0; }
+
+li { margin: 9px 0; }
+
+.faq {
+  padding: 4px 0 15px;
+  border-bottom: 1px solid var(--border);
+}
+
+.faq h3 { margin-bottom: 5px; }
+
+footer {
+  margin-top: 70px;
+  padding: 28px 5%;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  text-align: center;
+  font-size: .9rem;
+}
+
+footer a {
+  margin: 0 8px;
+  text-decoration: none;
+}
+
+@media(max-width: 520px) {
+  .nav { padding: 16px 5%; }
+  .hero { padding-top: 45px; }
+  h1 { letter-spacing: -1px; }
+  .panel { padding: 19px; }
+}
+</style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Personal Lending Tracker App — Remember Who Has Your Stuff",
+  "description": "Learn about Lendly, a personal lending tracker for organizing items lent to friends, borrower information, item values, and return dates.",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://getlendlyapp.com/track-items-you-lend.html"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Lendly",
+    "url": "https://getlendlyapp.com/"
+  }
+}
+</script>
+</head>
+
+<body>
+
+<nav class="nav">
+  <a class="logo" href="https://getlendlyapp.com/">Lend<span>ly</span></a>
+  <a class="nav-link" href="https://getlendlyapp.com/">Get Lendly &rarr;</a>
+</nav>
+
+<main class="container">
+
+<div class="breadcrumb">
+  <a href="https://getlendlyapp.com/">Home</a>
+  &nbsp; / &nbsp; Personal Lending Tracker
+</div>
+
+<header class="hero">
+  <span class="eyebrow">Your personal lending tracker</span>
+
+  <h1>Forgetting Who Has Your Stuff? Meet Lendly.</h1>
+
+  <p class="intro">
+    Forgetting items lent to friends? Don't know how to keep track of
+    things you lend to other people? Ever wondered, "Who borrowed my
+    stuff?" or "Where did my things go?" You're not alone. Keeping track
+    of items lent to friends, family members, classmates, and other
+    people can quickly become confusing.
+  </p>
+
+  <p>
+    <strong>Lendly is your personal lending tracker app, designed to
+    help you remember what you lent, who borrowed it, and when you
+    expect to get it back.</strong>
+  </p>
+
+  <p>
+    Whether you're lending out video games, books, clothes, chargers,
+    tools, accessories, or other personal belongings, Lendly helps you
+    keep your lending organized in one place.
+  </p>
+
+  <a class="cta" href="https://getlendlyapp.com/">
+    Get Lendly — $5 One Time &rarr;
+  </a>
+</header>
+
+<article>
+
+<section>
+<h2>Looking for an App to Keep Track of Things You Lend to Friends?</h2>
+
+<p>
+Have you ever lent someone something and completely forgotten who has
+it? Maybe a friend borrowed your favorite hoodie, someone took a game
+home, or you lent a charger to somebody who needed one. Days later,
+you want your item back, but you can't remember exactly who borrowed it.
+</p>
+
+<p>
+When you lend things regularly, remembering every item and every person
+becomes difficult. Conversations get forgotten, time passes, and
+suddenly you're trying to work out where your belongings went.
+</p>
+
+<p>
+Lendly helps solve this problem by giving you a dedicated place to
+track items you lend out. Instead of struggling to remember who has
+your stuff, you can keep the details organized with a personal
+lending tracker.
+</p>
+
+<p>
+If you've been searching for an app to track items lent to friends,
+an app to remember who borrowed your belongings, or a simple way to
+keep track of things you've lent out, Lendly was built for this purpose.
+</p>
+</section>
+
+<section>
+<h2>How to Remember Who Borrowed Your Stuff</h2>
+
+<p>
+One of the most frustrating things about lending personal belongings
+is forgetting who borrowed them. You might remember lending an item
+but forget who you gave it to, when you lent it, or when it was
+supposed to come back.
+</p>
+
+<p>
+Lendly helps you keep track of the important details associated with
+your lent items. You can record what you lent, identify who has it,
+keep their contact information, record the item's value, and note
+when it's due back.
+</p>
+
+<p>
+This makes Lendly useful for anyone who wants to remember who borrowed
+their stuff without relying entirely on memory.
+</p>
+
+<p>
+Instead of asking yourself, "Who has my charger?" or "Who did I lend
+that game to?", you have a dedicated lending record to check.
+</p>
+
+<a class="cta" href="https://getlendlyapp.com/">Discover Lendly &rarr;</a>
+</section>
+
+<section>
+<h2>A Personal Lending Tracker for Everyday Life</h2>
+
+<p>
+Lending items isn't limited to one type of person or one kind of
+belonging. Almost everyone occasionally lends something to somebody else.
+</p>
+
+<p>
+You might lend a friend a book, let someone borrow a video game, lend
+a family member a tool, or give a classmate a charger to use. You may
+even have several different items borrowed by several different people
+at the same time.
+</p>
+
+<p>
+Keeping all those lending arrangements straight can be difficult.
+</p>
+
+<p>
+Lendly is a personal lending tracker that helps you organize these
+everyday situations. It gives you a place to record your lent belongings
+and the people who borrowed them, helping you see what is still out.
+</p>
+
+<p>
+If you need a personal item lending app, a lending organizer, or an
+app for tracking personal belongings that other people have borrowed,
+Lendly offers a straightforward way to keep those records organized.
+</p>
+</section>
+
+<section>
+<h2>Keep Track of Items Lent to Friends and Family</h2>
+
+<p>
+Friends and family members are often the people we lend things to most
+frequently. Because these exchanges are casual, it's easy to forget
+the details.
+</p>
+
+<p>
+You might tell a friend they can borrow something for a few days.
+A family member might take an item home. Someone might borrow something
+and forget to mention when they'll return it.
+</p>
+
+<p>
+Lendly helps you keep track of who has your belongings, regardless of
+whether you lent them to a friend, family member, or someone else.
+</p>
+
+<p>
+By keeping your lending information organized, you can check your
+records when you need to remember which items are still borrowed.
+</p>
+
+<p>
+If you're looking for an app to track items borrowed by friends, a
+way to remember who has your belongings, or a personal lending
+organizer for everyday life, Lendly is designed to help.
+</p>
+</section>
+
+<section>
+<h2>Track What You Lent, Who Has It, and When It's Due Back</h2>
+
+<p>
+A useful lending record needs more than just the name of an item.
+You also want to know who borrowed it and when you expect to get it back.
+</p>
+
+<p>Lendly helps you keep track of the details that matter:</p>
+
+<ul>
+<li><strong>Items lent out:</strong> Remember what belongings you've lent to other people.</li>
+<li><strong>Borrower information:</strong> Keep track of who has each item.</li>
+<li><strong>Contact details:</strong> Record information that helps you contact the borrower.</li>
+<li><strong>Expected return dates:</strong> Keep track of when items are due back.</li>
+<li><strong>Item value:</strong> Record what your lent belongings are worth.</li>
+</ul>
+
+<p>
+Having these details together makes it easier to stay organized when
+you lend multiple items to different people.
+</p>
+
+<p>
+Whether you call it a lending tracker, a borrowed item organizer, a
+personal loaned-item tracker, or an app for keeping track of lent
+belongings, the goal is the same: know what you lent and who has it.
+</p>
+</section>
+
+<aside class="panel">
+<h2>Stop Forgetting About Items You've Lent Out</h2>
+
+<p>
+It's easy to forget small lending favors because they happen throughout
+everyday life. You might lend one thing in the morning, another thing
+a few days later, and something else the following week.
+</p>
+
+<p>
+Eventually, remembering every item becomes a challenge.
+</p>
+
+<p>
+Lendly helps you keep your lending records in one dedicated place so
+you can check who borrowed what. Rather than trying to reconstruct old
+conversations, you can refer to the information you recorded.
+</p>
+
+<p>
+For people who frequently lend belongings to others, having a personal
+lending tracker can make it easier to stay organized and remember which
+items still need to come home.
+</p>
+
+<a class="cta" href="https://getlendlyapp.com/">
+Get Lendly for $5 &rarr;
+</a>
+</aside>
+
+<section>
+<h2>Who Is Lendly For?</h2>
+
+<p>
+Lendly is for people who want a simpler way to keep track of the things
+they lend.
+</p>
+
+<p>It's useful to consider if you:</p>
+
+<ul>
+<li>Frequently lend belongings to friends.</li>
+<li>Forget who borrowed your personal items.</li>
+<li>Want to remember what you've lent out.</li>
+<li>Need to keep track of several borrowed items at once.</li>
+<li>Want to record borrowers and their contact information.</li>
+<li>Need a place to record when lent items are due back.</li>
+<li>Want to organize your lending records instead of relying on memory.</li>
+</ul>
+
+<p>
+If you've ever searched for "how do I keep track of stuff I lend to
+friends?", "what app tells me who borrowed my stuff?", or "how can I
+remember who has my belongings?", Lendly is designed around that
+exact problem.
+</p>
+</section>
+
+<section>
+<h2>Frequently Asked Questions About Tracking Lent Items</h2>
+
+<div class="faq">
+<h3>How can I keep track of things I lend to friends?</h3>
+<p>
+Lendly is a personal lending tracker designed to help you record what
+you lend, who borrowed it, their contact information, the item's value,
+and when it's due back.
+</p>
+</div>
+
+<div class="faq">
+<h3>Is there an app for remembering who borrowed my stuff?</h3>
+<p>
+Yes. Lendly is designed specifically to help you organize items you've
+lent and remember who has them. Visit
+<a href="https://getlendlyapp.com/">getlendlyapp.com</a> to learn more.
+</p>
+</div>
+
+<div class="faq">
+<h3>What is a personal lending tracker?</h3>
+<p>
+A personal lending tracker is a tool for recording belongings you've
+lent to other people, who borrowed each item, and when you expect it
+to be returned. Lendly is an app built around this use case.
+</p>
+</div>
+
+<div class="faq">
+<h3>How do I track items lent to friends and family?</h3>
+<p>
+Lendly lets you keep a record of items you've lent, the people who have
+them, their contact details, the value of the items, and expected
+return dates.
+</p>
+</div>
+
+<div class="faq">
+<h3>Can I use Lendly to remember when borrowed items are due back?</h3>
+<p>
+Lendly is designed to help you record when lent items are due back,
+making it easier to keep track of expected return dates.
+</p>
+</div>
+
+<div class="faq">
+<h3>Does Lendly cost money?</h3>
+<p>
+Lendly is offered for a one-time payment of $5, rather than a recurring
+monthly subscription. Visit the official website for current
+purchase information.
+</p>
+</div>
+
+<div class="faq">
+<h3>Where can I get Lendly?</h3>
+<p>
+Visit <a href="https://getlendlyapp.com/">getlendlyapp.com</a> to learn
+more about Lendly and get access to the personal lending tracker.
+</p>
+</div>
+</section>
+
+<section class="panel">
+<h2>Get Lendly — Remember Who Has Your Stuff</h2>
+
+<p>
+Stop wondering who borrowed your belongings. Keep track of what you
+lend, who has it, their contact information, the item's value, and
+when it's due back.
+</p>
+
+<p>
+If you're looking for an app to track things lent to friends, a
+personal lending tracker, or a simple way to remember who borrowed
+your stuff, Lendly is built for you.
+</p>
+
+<p><strong>Lend it. Track it. Get it back.</strong></p>
+
+<p>Get Lendly today for a one-time payment of $5.</p>
+
+<a class="cta" href="https://getlendlyapp.com/">
+Get Lendly Today &rarr;
+</a>
+</section>
+
+</article>
+</main>
+
+<footer>
+<p>&copy; 2026 Lendly. All rights reserved.</p>
+<p>
+<a href="https://getlendlyapp.com/">Home</a>
+<a href="https://getlendlyapp.com/privacy.html">Privacy Policy</a>
+<a href="https://getlendlyapp.com/terms.html">Terms of Service</a>
+</p>
+</footer>
+
+</body>
+</html>
